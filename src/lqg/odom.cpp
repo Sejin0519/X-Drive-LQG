@@ -8,16 +8,18 @@ Odometry::Odometry(const Config& config)
 {}
 
 void Odometry::initialize() {
+    //reset sensors
     imu.reset(true);
-
     horizontalEncoder.reset_position();
     verticalEncoder.reset_position();
 
     pros::c::controller_rumble(pros::E_CONTROLLER_MASTER, ".");
-    
+
     setPose(0, 0, 0);
+
     saveTime = pros::millis() / 1000.0;
 
+    //start odom task
     odomTask.emplace([this]() { this->update(); });
 }
 
@@ -29,12 +31,11 @@ Pose Odometry::getPose(bool radians){
     return currentPose;
 }
 
-Vector6d Odometry::getState() {
+Eigen::Vector3d Odometry::getState() {
     mutex.take();
     Pose currentPose = pose;
-    Pose currentVel = velocity;
     mutex.give();
-    Vector6d currentState = {currentPose.x, currentPose.y, currentPose.theta, currentVel.x, currentVel.y, currentVel.theta};
+    Eigen::Vector3d currentState = {currentPose.x, currentPose.y, currentPose.theta};
     return currentState;
 }
 
@@ -58,11 +59,16 @@ void Odometry::setPose(double x, double y, double theta) {
 
 Eigen::Vector3d Odometry::getSensorReadings() {
     Eigen::Vector3d readings;
+
+    //centidegrees
     double horizontalPosition = horizontalEncoder.get_position();
     double verticalPosition = verticalEncoder.get_position();
 
+    //convert encoder positions to distances in inches
     double horizontalDist = horizontalPosition / 36000.0 * M_PI * config.horizontalDiam;
     double verticalDist = verticalPosition / 36000.0 * M_PI * config.verticalDiam;
+
+    //get current rotation from IMU in radians
     double theta = wrapAngle(-degToRad(imu.get_rotation()));
 
     readings << horizontalDist, verticalDist, theta;
@@ -73,9 +79,11 @@ Eigen::Vector3d Odometry::getSensorReadings() {
 void Odometry::update() {
 
     while(true) {
-        mutex.take();
         Eigen::Vector3d readings = getSensorReadings();
 
+        mutex.take();
+
+        //calculate change in sensor readings since last update
         double deltaHorizontal = readings(0) - prevHorizontalDist;
         double deltaVertical = readings(1) - prevVerticalDist;
         double deltaTheta = wrapAngle(readings(2) - prevTheta);
@@ -84,11 +92,12 @@ void Odometry::update() {
         prevVerticalDist = readings(1);
         prevTheta = readings(2);
 
+        //midpoint orientation for the displacement
         double midTheta = pose.theta + deltaTheta / 2.0;
         double localDeltaX, localDeltaY;
 
-
-        if(std::fabs(deltaTheta) < 1e-9) {
+        //calculate local displacement
+        if(std::fabs(deltaTheta) < 1e-9) { //
             localDeltaX = deltaHorizontal;
             localDeltaY = deltaVertical;
         } else {
@@ -96,22 +105,10 @@ void Odometry::update() {
             localDeltaY = 2.0 * std::sin(deltaTheta / 2.0) * (deltaVertical / deltaTheta + config.verticalOffset);
         }
 
-
-
+        //update global pose
         pose.x += std::cos(midTheta) * localDeltaX - std::sin(midTheta) * localDeltaY;
         pose.y += std::sin(midTheta) * localDeltaX + std::cos(midTheta) * localDeltaY;
         pose.theta = readings(2);
-
-        double deltaT = pros::millis() / 1000.0 - saveTime;
-
-        if(deltaT > 0.0) {
-            velocity.x = (pose.x - prevPose.x) / deltaT;
-            velocity.y = (pose.y - prevPose.y) / deltaT;
-            velocity.theta = wrapAngle(pose.theta - prevPose.theta) / deltaT;
-
-            prevPose = pose;
-            saveTime += deltaT;
-        }
 
         mutex.give();
         pros::delay(10);

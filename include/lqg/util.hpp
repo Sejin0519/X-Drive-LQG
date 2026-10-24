@@ -1,5 +1,8 @@
 #pragma once
+#include "Eigen/Dense"
 #include <cmath>
+
+using Vector6d = Eigen::Matrix<double, 6, 1>;
 
 struct Pose {
     double x = 0.0;
@@ -21,3 +24,6 @@ inline double wrapAngle(double angle) {
     return angle;
 } //-pi to pi
 
+inline double sign(double value) {
+    return (value > 0.0) - (value < 0.0);
+}

@@ -1,4 +1,49 @@
-#include "main.h"
+#include "mylib/main.h"
+#include "mylib/controller.hpp"
+#include "mylib/sysid.hpp"
+#include "mylib/paths.hpp"
+pros::Controller master(pros::E_CONTROLLER_MASTER);
+Config config = toSI({
+	.centerToWheel = 6.46,
+	.wheelRadius = 1.375,
+	.gearRatio = 60.0/36.0,
+	.motorPorts = {-12, -15, -17, -16},
+	.verticalEncoderPort = 13,
+	.horizontalEncoderPort = -18,
+	.imuPort = 14,
+	.horizontalOffset = 0,
+	.verticalOffset = 0,
+	.horizontalDiam = 2.125,
+	.verticalDiam = 2.125,
+	.dt = 0.01,
+	
+	.kV    = 0.165,   
+	.kV_r  = 0.163,
+	.kA    = 0.026,   
+	.kA_r  = 0.0076,
+
+	.vStatic = 0.45,
+	.vMax = 12,
+
+	.qPos = 1500, //needs tuning
+	.qVel = 10,
+	.rTrans = 0.0625,
+	.qAng = 100,
+	.qAngVel = 1,
+	.rRot = 0.1,
+
+
+    .qPos_f = 1e-8,
+    .qVel_f = 4e-4,
+    .rTrans_f = 4e-6,
+    .qAng_f = 2.5e-7,
+    .qAngVel_f = 0.0075,
+    .rRot_f = 9e-6
+});
+Odometry odom(config);
+Chassis chassis(config);
+SysID sysId(chassis);
+Controller controller(chassis, odom, config);
 
 /**
  * A callback function for LLEMU's center button.
@@ -23,10 +68,8 @@ void on_center_button() {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
-	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Hello PROS User!");
-
-	pros::lcd::register_btn1_cb(on_center_button);
+	odom.initialize();
+	controller.runMotion();
 }
 
 /**
@@ -60,6 +103,9 @@ void competition_initialize() {}
  */
 void autonomous() {}
 
+
+
+
 /**
  * Runs the operator control code. This function will be started in its own task
  * with the default priority and stack size whenever the robot is enabled via
@@ -74,21 +120,33 @@ void autonomous() {}
  * task, not resume it from where it left off.
  */
 void opcontrol() {
-	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	pros::MotorGroup left_mg({1, -2, 3});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
-	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
+	// sysId.moveRamp(5, 9000);
+	// pros::delay(1000);
+	// sysId.moveRamp(-5, 9000);
+	// chassis.stop();
 
+	// chassis.slowRamp(15, 5000, true);
+	// pros::delay(1000);
+	// chassis.slowRamp(-15, 5000, true);
+	// chassis.stop();
+	// printf("---\n");//borderline
+	// odom.initialize();
+	// sysId.turnStep(4000, 1500);
+	// sysId.turnStep(-4000, 1500);
+	// sysId.turnStep(8000, 1500);
+	// sysId.turnStep(-8000, 1500);
+	// sysId.turnStep(12000, 1500);
+	// sysId.turnStep(-12000, 1500);
+	// chassis.stop();
+	// while(true) {
+	// 	Vector6d x = odom.getState();
+	// 	master.set_text(0, 0, "Vel: " + std::to_string(x(3)));
+	// 	master.clear_line(0);
 
-	while (true) {
-		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
-		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
-		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
+	// 	pros::delay(500);
+	// }
+	// DEBUG: test run, prints the logged filtered state at the end
+	controller.followTrajectory(trajectory::Path);
+	controller.waitUntilDone();
 
-		// Arcade control scheme
-		int dir = master.get_analog(ANALOG_LEFT_Y);    // Gets amount forward/backward from left joystick
-		int turn = master.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
-		left_mg.move(dir - turn);                      // Sets left motor voltage
-		right_mg.move(dir + turn);                     // Sets right motor voltage
-		pros::delay(20);                               // Run for 20 ms then update
-	}
 }

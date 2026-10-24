@@ -23,8 +23,9 @@ Reference Trajectory::sample(double t) {
     if(t < points[carriedIndex].time) carriedIndex = 0; //when the input t is smaller than carry, search from the start
     while(carriedIndex < count - 1 && points[carriedIndex + 1].time < t) carriedIndex++;
 
-    const auto& pointBehind = points[carriedIndex];
-    const auto& pointAhead = points[carriedIndex + 1];
+    //linear interpolation between the two trajectory points
+    const trajectory::trajectoryPoint& pointBehind = points[carriedIndex];
+    const trajectory::trajectoryPoint& pointAhead = points[carriedIndex + 1];
 
     double localT = (t - pointBehind.time) / (pointAhead.time - pointBehind.time);
 
