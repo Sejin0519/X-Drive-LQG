@@ -11,36 +11,16 @@ A simple LQG motion control for VEX V5 X-Drives
 ```mermaid
 flowchart LR
     ref["Reference<br/>trajectory"]
-
-    subgraph tracking["Trajectory Tracking"]
-        direction TB
-        ff["Feedforward"]
-        lqr["LQR feedback"]
-        sum(("+"))
-        ff --> sum
-        lqr --> sum
-    end
-
-    subgraph robot["X-Drive Robot"]
-        direction TB
-        mix["X-drive mixing"]
-        motors["Motors"]
-        mix --> motors
-    end
-
-    subgraph estimation["State Estimation"]
-        direction TB
-        odom["Odometry"]
-        kf["Kalman filter"]
-        odom --> kf
-    end
-
-    ref --> ff
+    ff["Feedforward"]
+    lqr["LQR<br/>feedback"]
+    sum(("+"))
     ref --> lqr
-    sum --> mix
-    motors --> odom
-    kf -->|"Estimated state"| lqr
-    mix -. "Applied commands" .-> kf
+    lqr --> sum
+    ref --> ff
+    ff --> sum
+    sum --> mix["X-drive<br/>mixing"] --> motors["Motors"] --> odom["Odometry"] --> kf["Kalman<br/>filter"]
+    mix -.->|"applied commands"| kf
+    kf -->|"estimated state"| lqr
 ```
 
 This template controls a VEX X-Drive with Linear Quadratic Gaussian (LQG). Kalman Filter (LQE) estimates the robot's position and velocity, and Linear Quadratic Regulator (LQR) turns the error into motor commands. LQR requires a linear time-invariant (LTI) model. Because X-drives are holonomic, they can be modeled this way by setting input commands as acceleration in global frame `[x, y, theta]`. Decoupling these axes reduces the kinematics into a straightforward double-integrator model. 
